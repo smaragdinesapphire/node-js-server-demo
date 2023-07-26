@@ -1,8 +1,14 @@
-const fs = require("fs").promises;
-const WebSocket = require("ws");
-const path = require("path");
-const express = require("express");
-const cors = require("cors");
+import fsModule from "fs";
+import { WebSocketServer } from "ws";
+import path from "path";
+import express from "express";
+import cors from "cors";
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const fs = fsModule.promises;
 const PORT = 8080;
 
 const app = express();
@@ -12,7 +18,7 @@ const server = app.listen(PORT, () => {
   console.log(`Listening on ${PORT}`);
 });
 
-const wss = new WebSocket.Server({ server });
+const wss = new WebSocketServer({ server });
 
 const writeToFile = (path, data) => {
   const jsonStr = JSON.stringify(data);
@@ -40,10 +46,10 @@ wss.on("connection", (ws) => {
 
       switch (type) {
         case "save":
-          writeToFile(path.join(__dirname, "../data/data.log"), data);
+          writeToFile(path.join(__dirname, "../data/myData.json"), data);
           break;
         case "load":
-          readFile(path.join(__dirname, "../data/data.log")).then((contents) =>
+          readFile(path.join(__dirname, "../data/myData.jason")).then((contents) =>
             ws.send(contents)
           );
           break;
@@ -66,13 +72,16 @@ wss.on("connection", (ws) => {
 app.post("/save", (req, res) => {
   console.log("http save");
   req.on("data", (data) => {
-    return writeToFile(path.join(__dirname, "../data/data.log"), JSON.parse(data));
+    return writeToFile(
+      path.join(__dirname, "../data/myData.json"),
+      JSON.parse(data)
+    );
   });
 });
 
 app.get("/load", (req, res) => {
   console.log("http load");
-  readFile(path.join(__dirname, "../data/data.log"))
+  readFile(path.join(__dirname, "../data/myData.json"))
     .then((contents) => {
       res.status(200).json(contents);
     })
