@@ -3,10 +3,9 @@ import { WebSocketServer } from "ws";
 import path from "path";
 import express from "express";
 import cors from "cors";
-import { fileURLToPath } from 'url';
+import pathUnit from "./utils/pathUnit.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const { __dirname } = pathUnit(import.meta.url);
 
 const fs = fsModule.promises;
 const PORT = 8080;
@@ -20,10 +19,10 @@ const server = app.listen(PORT, () => {
 
 const wss = new WebSocketServer({ server });
 
-const writeToFile = (path, data) => {
+const writeToFile = (filePath, data) => {
   const jsonStr = JSON.stringify(data);
   return fs
-    .writeFile(path, jsonStr)
+    .writeFile(filePath, jsonStr)
     .then(() => console.log("Data written to file successfully."))
     .catch((err) => {
       console.error("Error writing to file:", err);
@@ -31,10 +30,14 @@ const writeToFile = (path, data) => {
     });
 };
 
-const readFile = (path) => {
+const readFile = (filePath) => {
   return fs
-    .readFile(path)
-    .then((contents) => JSON.stringify(JSON.parse(contents)));
+    .readFile(filePath)
+    .then((contents) => JSON.stringify(JSON.parse(contents)))
+    .catch((e) => {
+      console.log("Read fail:", e);
+      return Promise.reject();
+    });
 };
 
 wss.on("connection", (ws) => {
@@ -49,8 +52,8 @@ wss.on("connection", (ws) => {
           writeToFile(path.join(__dirname, "../data/myData.json"), data);
           break;
         case "load":
-          readFile(path.join(__dirname, "../data/myData.jason")).then((contents) =>
-            ws.send(contents)
+          readFile(path.join(__dirname, "../data/myData.jason")).then(
+            (contents) => ws.send(contents)
           );
           break;
         default:
