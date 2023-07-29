@@ -4,6 +4,7 @@ import path from "path";
 import express from "express";
 import cors from "cors";
 import pathUnit from "./utils/pathUnit.js";
+import parseBufferUnit from "./utils/parseBufferUnit.js";
 
 const { __dirname } = pathUnit(import.meta.url);
 
@@ -24,9 +25,11 @@ const writeToFile = (filePath, data) => {
   return fs
     .writeFile(filePath, jsonStr)
     .then(() => console.log("Data written to file successfully."))
-    .catch((err) => {
-      console.error("Error writing to file:", err);
-      return Promise.reject();
+    .catch((e) => {
+      console.error(`Write fail(${writeToFile.name}):`, e.message);
+      return Promise.reject(
+        new Error("The server has some issue, please check it.")
+      );
     });
 };
 
@@ -35,8 +38,12 @@ const readFile = (filePath) => {
     .readFile(filePath)
     .then((contents) => JSON.stringify(JSON.parse(contents)))
     .catch((e) => {
-      console.log("Read fail:", e);
-      return Promise.reject();
+      console.error(`Read fail(${readFile.name}):`, e.message);
+      if (e.code === "ENOENT")
+        return Promise.reject(new Error("Can't find the file."));
+      return Promise.reject(
+        new Error("The server has some issue, please check it.")
+      );
     });
 };
 
@@ -44,24 +51,31 @@ wss.on("connection", (ws) => {
   console.log("Client connected.");
 
   ws.on("message", (message) => {
-    try {
-      const { type, data } = JSON.parse(message);
-
-      switch (type) {
-        case "save":
-          writeToFile(path.join(__dirname, "../data/myData.json"), data);
-          break;
-        case "load":
-          readFile(path.join(__dirname, "../data/myData.jason")).then(
-            (contents) => ws.send(contents)
-          );
-          break;
-        default:
-          throw Error();
-      }
-    } catch (error) {
-      console.error("Invalid JSON:", message);
-    }
+    parseBufferUnit("json", message)
+      .then(({ type, data }) => {
+        switch (type) {
+          case "save":
+            return writeToFile(
+              path.join(__dirname, "../data/myData.json"),
+              data
+            ).then(() => ws.send("Save success."));
+          case "load":
+            return readFile(path.join(__dirname, "../data/myData.json")).then(
+              (contents) => ws.send(contents)
+            );
+          case "refresh":
+            const clients = wss.clients;
+            clients.forEach((client) =>
+              client.send(JSON.stringify({ type: "refresh" }))
+            );
+            return;
+          default:
+            return Promise.reject(new Error(`Not support type: ${type}`));
+        }
+      })
+      .catch((e) => {
+        ws.send(e.message);
+      });
   });
 
   ws.on("close", () => {
@@ -75,23 +89,18 @@ wss.on("connection", (ws) => {
 app.post("/save", (req, res) => {
   console.log("http save");
   req.on("data", (data) => {
-    return writeToFile(
-      path.join(__dirname, "../data/myData.json"),
-      JSON.parse(data)
-    );
+    parseBufferUnit("json", data)
+      .then((data) =>
+        writeToFile(path.join(__dirname, "../data/myData.json"), data)
+      )
+      .then(() => res.status(200).end("Save success."))
+      .catch((e) => res.status(500).end(e.message));
   });
 });
 
 app.get("/load", (req, res) => {
   console.log("http load");
   readFile(path.join(__dirname, "../data/myData.json"))
-    .then((contents) => {
-      res.status(200).json(contents);
-    })
-    .catch((e) => {
-      console.log(e);
-      res
-        .status(500)
-        .end(e.code === "ENOENT" ? "no record" : "something error");
-    });
+    .then((contents) => res.status(200).json(JSON.parse(contents)))
+    .catch((e) => res.status(500).end(e.message));
 });
