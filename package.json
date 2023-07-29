@@ -1,5 +1,6 @@
 {
   "name": "server",
+  "version": "1.0.0",
   "description": "NodeJS server demo",
   "author": {
     "name": "jie.zhang",
