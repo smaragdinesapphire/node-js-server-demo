@@ -7,7 +7,7 @@ const parseJSON = (dataStr) =>
     }
   });
 
-const parseBufferUnit = (type, data) => {
+const parseBuffer = (type, data) => {
   const dataStr = data.toString();
   switch (type) {
     case "json":
@@ -19,4 +19,4 @@ const parseBufferUnit = (type, data) => {
   }
 };
 
-export default parseBufferUnit;
+export default parseBuffer;
