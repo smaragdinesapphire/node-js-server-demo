@@ -1,14 +1,13 @@
-import fsModule from "fs";
 import { WebSocketServer } from "ws";
 import path from "path";
 import express from "express";
 import cors from "cors";
-import pathUnit from "./utils/pathUnit.js";
-import parseBufferUnit from "./utils/parseBufferUnit.js";
+import pathUtil from "./utils/pathUtil.js";
+import parseBuffer from "./utils/parseBuffer.js";
+import { writeFile, readFile } from "./utils/fileUtils.js";
 
-const { __dirname } = pathUnit(import.meta.url);
+const { __dirname } = pathUtil(import.meta.url);
 
-const fs = fsModule.promises;
 const PORT = 8080;
 
 const app = express();
@@ -20,47 +19,21 @@ const server = app.listen(PORT, () => {
 
 const wss = new WebSocketServer({ server });
 
-const writeToFile = (filePath, data) => {
-  const jsonStr = JSON.stringify(data);
-  return fs
-    .writeFile(filePath, jsonStr)
-    .then(() => console.log("Data written to file successfully."))
-    .catch((e) => {
-      console.error(`Write fail(${writeToFile.name}):`, e.message);
-      return Promise.reject(
-        new Error("The server has some issue, please check it.")
-      );
-    });
-};
-
-const readFile = (filePath) => {
-  return fs
-    .readFile(filePath)
-    .then((contents) => JSON.stringify(JSON.parse(contents)))
-    .catch((e) => {
-      console.error(`Read fail(${readFile.name}):`, e.message);
-      if (e.code === "ENOENT")
-        return Promise.reject(new Error("Can't find the file."));
-      return Promise.reject(
-        new Error("The server has some issue, please check it.")
-      );
-    });
-};
-
 wss.on("connection", (ws) => {
   console.log("Client connected.");
 
   ws.on("message", (message) => {
-    parseBufferUnit("json", message)
+    parseBuffer("json", message)
       .then(({ type, data }) => {
         switch (type) {
           case "save":
-            return writeToFile(
-              path.join(__dirname, "../data/myData.json"),
+            return writeFile(
+              path.join(__dirname, "./data/"),
+              "myData.json",
               data
             ).then(() => ws.send("Save success."));
           case "load":
-            return readFile(path.join(__dirname, "../data/myData.json")).then(
+            return readFile(path.join(__dirname, "./data/myData.json")).then(
               (contents) => ws.send(contents)
             );
           case "refresh":
@@ -89,9 +62,9 @@ wss.on("connection", (ws) => {
 app.post("/save", (req, res) => {
   console.log("http save");
   req.on("data", (data) => {
-    parseBufferUnit("json", data)
+    parseBuffer("json", data)
       .then((data) =>
-        writeToFile(path.join(__dirname, "../data/myData.json"), data)
+        writeFile(path.join(__dirname, "./data/"), "myData.json", data)
       )
       .then(() => res.status(200).end("Save success."))
       .catch((e) => res.status(500).end(e.message));
@@ -100,7 +73,7 @@ app.post("/save", (req, res) => {
 
 app.get("/load", (req, res) => {
   console.log("http load");
-  readFile(path.join(__dirname, "../data/myData.json"))
+  readFile(path.join(__dirname, "./data/myData.json"))
     .then((contents) => res.status(200).json(JSON.parse(contents)))
     .catch((e) => res.status(500).end(e.message));
 });
